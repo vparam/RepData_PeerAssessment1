@@ -1,25 +1,90 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "PA1_template.Rmd"
+output: html_document
 ---
+# Reproducible Research: Peer Assessment 1
+-----
+## Code for reading in the dataset and/or processing the data
+
+```{r}
+setwd("~/ML/Reproducible Research/WK1/repdata_data_activity")
+steps <-read.csv("activity.csv")
+stepperday<-tapply(steps$steps, steps$date, sum)
+```
+
+##Histogram of the total number of steps taken each day
+```{r}
+hist(stepperday, main="Steps per day", xla="steps", yla="number of days")
+```
+
+##Mean and median number of steps taken each day 
+```{r}
+mean(stepperday, na.rm=T)
+median(stepperday, na.rm=T)
+```
 
 
-## Loading and preprocessing the data
+##Time series plot of the average number of steps taken
+```{r}
+stepmin<-aggregate(steps$steps, list(steps$interval), mean, na.rm=T)
+names(stepmin)<-c("interval", "steps")
+plot(stepmin$interval, stepmin$steps, type="l")
+```
+
+##The 5-minute interval that, on average, contains the maximum number of steps
+```{r}
+stepmin[order(stepmin$steps),][288,]$interval
+```
+
+## Code to describe and show a strategy for imputing missing data
+
+Some timepoints are zero, so we need to determine whether a give point should be zero, and if not, impute based on interval and day. 
+
+```{r}
+length(which(is.na(steps$steps)))
+steps$hour = floor(steps$interval/100)
+steps$period=floor(steps$hour/3)
+steps$period<-factor(steps$period)
+levels(steps$period)<-c("0-2", "3-5", "6-8", "9-11", "12-14", "15-17", "18-20", "21-23")
+mod<-lm(steps ~ period, data=steps)
+mod
+steps$stepsi<-steps$steps
+steps$stepsi[is.na(steps$steps)]<-predict(mod, newdata=steps[is.na(steps$steps),])
+```
+
+## Histogram of the total number of steps taken each day after missing values are imputed
+```{r}
+stepperdayi<-tapply(steps$stepsi, steps$date, sum, na.rm=T)
+stepperdayi
+hist(stepperdayi, main="Steps per day (with imputed data)", xla="steps", yla="number of days", col="#ff99ff")
+```
+*mean (with imputed data)*:
+```{r}
+mean(stepperdayi, na.rm=T)
+```
+*median  (with imputed data)*:
+```{r}
+median(stepperdayi, na.rm=T)
+```
 
 
 
-## What is mean total number of steps taken per day?
+## Panel plot comparing the average number of steps taken per 5-minute interval across weekdays and weekends
+
+```{r}
+steps$ddate<-as.character(steps$date)
+steps$ddate<-as.Date(steps$ddate, format="%Y-%m-%d")
+steps$weekday<-weekdays(steps$ddate)
+steps$weekend<-F
+steps$weekend[steps$weekday %in% c("Saturday", "Sunday")]<-T
+
+stepmin.i.weekdays<-aggregate(steps$stepsi[!steps$weekend], list(steps$interval[!steps$weekend]), mean, na.rm=T)
+stepmin.i.weekends<-aggregate(steps$stepsi[steps$weekend], list(steps$interval[steps$weekend]), mean, na.rm=T)
+names(stepmin.i.weekdays)<-c("interval", "steps")
+names(stepmin.i.weekends)<-c("interval", "steps")
 
 
-
-## What is the average daily activity pattern?
-
-
-
-## Imputing missing values
-
-
-
-## Are there differences in activity patterns between weekdays and weekends?
+par(mfrow = c(2,1), mar = c(4, 4, 2, 1), oma = c(0, 0, 2, 0))
+plot(stepmin.i.weekends$interval, stepmin.i.weekends$steps, pch="", ylab="Steps", xlab="", main="weekend", type="l", ylim=c(0,220), col="blue")
+plot(stepmin.i.weekdays$interval, stepmin.i.weekdays$steps, pch="", ylab="Steps", xlab="", main="weekday", type="l",  ylim=c(0,220), col="darkred")
+```
